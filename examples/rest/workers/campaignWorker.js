@@ -5,6 +5,19 @@ const { DateTime } = require('luxon');
 
 const prisma = new PrismaClient();
 
+/** Helpers de log padronizados */
+function log(scope, ...args) {
+  console.log(`[${new Date().toISOString()}] [${scope}]`, ...args);
+}
+
+function error(scope, ...args) {
+  console.error(`[${new Date().toISOString()}] [${scope} ❌]`, ...args);
+}
+
+function warn(scope, ...args) {
+  console.warn(`[${new Date().toISOString()}] [${scope} ⚠️]`, ...args);
+}
+
 // API externa (ajustado para sua porta atual)
 const WHATSAPP_EXTERNAL_API =
   process.env.WHATSAPP_EXTERNAL_API || 'http://localhost:3001';
@@ -18,6 +31,9 @@ const MAX_CAMPAIGN_CONCURRENCY = Number(
 const PROCESSING_TTL_MS = Number(
   process.env.PROCESSING_TTL_MS || 30 * 60 * 1000
 ); // 30min
+
+// Intervalo do orquestrador
+const ORCHESTRATOR_TICK_MS = Number(process.env.ORCHESTRATOR_TICK_MS || 3000);
 
 function parsePayload(raw) {
   try {
@@ -76,17 +92,24 @@ function getCurrentBrazilTime() {
 async function reviveStuckProcessing() {
   try {
     const cutoff = new Date(Date.now() - PROCESSING_TTL_MS);
+
+    log('REVIVE', 'Verificando mensagens presas antes de:', cutoff);
+
     const res = await prisma.campaignDispatch.updateMany({
       where: { status: 'processing', updatedAt: { lt: cutoff } },
       data: { status: 'pending' },
     });
+
     if (res.count > 0) {
-      console.log(
-        `♻️  Revividas ${res.count} mensagens presas em 'processing' (voltaram para 'pending').`
+      warn(
+        'REVIVE',
+        `♻️ Revividas ${res.count} mensagens presas em processing`
       );
+    } else {
+      log('REVIVE', 'Nenhuma mensagem presa encontrada');
     }
   } catch (err) {
-    console.error('⚠️ Erro ao reviver processing antigos:', err.message);
+    error('REVIVE', err.message);
   }
 }
 
@@ -102,6 +125,8 @@ async function reviveStuckProcessing() {
 async function claimNextContactBatch(campaignId) {
   // Usa horário do Brasil para comparações
   const now = getCurrentBrazilTime();
+
+  log('CLAIM', `Tentando pegar próximo contato da campanha ${campaignId}`);
 
   return prisma.$transaction(
     async (tx) => {
@@ -125,7 +150,21 @@ async function claimNextContactBatch(campaignId) {
         ],
       });
 
-      if (!first) return null;
+      if (!first) {
+        log(
+          'CLAIM',
+          `Nenhuma mensagem pendente encontrada na campanha ${campaignId}`
+        );
+        return null;
+      }
+
+      log(
+        'CLAIM',
+        'Contato encontrado:',
+        first.contact,
+        '| Sessão:',
+        first.sessionName
+      );
 
       const claimTime = getCurrentBrazilTime();
 
@@ -149,8 +188,14 @@ async function claimNextContactBatch(campaignId) {
 
       if (upd.count === 0) {
         // corrida: alguém pegou antes
+        warn(
+          'CLAIM',
+          `Corrida detectada na campanha ${campaignId}. Outro worker pegou primeiro.`
+        );
         return null;
       }
+
+      log('CLAIM', `Travadas ${upd.count} mensagens em "processing"`);
 
       // Busca SOMENTE o que acabamos de “pegar” (heurística pelo updatedAt >= claimTime)
       const batch = await tx.campaignDispatch.findMany({
@@ -164,10 +209,19 @@ async function claimNextContactBatch(campaignId) {
         orderBy: { messageOrder: 'asc' },
       });
 
+      log(
+        'CLAIM',
+        `Batch carregado para contato ${first.contact}:`,
+        batch.length,
+        'mensagens'
+      );
+
       const contactData = await tx.segmentContact.findFirst({
         where: { phone: first.contact },
         select: { name: true, email: true, empresa: true },
       });
+
+      log('CLAIM', 'Dados do contato carregados:', contactData);
 
       return {
         contact: first.contact,
@@ -185,7 +239,7 @@ async function claimNextContactBatch(campaignId) {
  * respeitando o delay entre mensagens (delay) e entre contatos (contactDelay).
  */
 async function processCampaign(campaignId) {
-  console.log(`🚀 Iniciando loop da campanha ${campaignId}`);
+  log('CAMPAIGN', `🚀 Iniciando loop da campanha ${campaignId}`);
 
   // Consulta inicial de delays e status
   let campaign;
@@ -195,14 +249,19 @@ async function processCampaign(campaignId) {
       select: { delay: true, contactDelay: true, status: true },
     });
   } catch (err) {
-    console.error(`⚠️ [${campaignId}] Erro ao buscar campanha:`, err.message);
+    error('CAMPAIGN', `[${campaignId}] Erro ao buscar campanha:`, err.message);
     return;
   }
 
   if (!campaign) {
-    console.log(`⚠️ [${campaignId}] Campanha não encontrada. Encerrando.`);
+    warn('CAMPAIGN', `[${campaignId}] Campanha não encontrada. Encerrando.`);
     return;
   }
+
+  log(
+    'CAMPAIGN',
+    `[${campaignId}] Config inicial → delay=${campaign.delay} | contactDelay=${campaign.contactDelay} | status=${campaign.status}`
+  );
 
   while (true) {
     try {
@@ -212,9 +271,18 @@ async function processCampaign(campaignId) {
         select: { delay: true, contactDelay: true, status: true },
       });
 
-      if (!campaign || campaign.status === 'paused') {
-        console.log(
-          `⏸ [${campaignId}] Campanha pausada/indisponível. Aguardando 10s...`
+      if (!campaign) {
+        warn(
+          'CAMPAIGN',
+          `[${campaignId}] Campanha não encontrada durante o loop. Encerrando.`
+        );
+        return;
+      }
+
+      if (campaign.status === 'paused') {
+        log(
+          'CAMPAIGN',
+          `[${campaignId}] Campanha pausada/indisponível. Aguardando 10s...`
         );
         await new Promise((r) => setTimeout(r, 10000));
         continue;
@@ -223,12 +291,18 @@ async function processCampaign(campaignId) {
       const delayMs = Number(campaign?.delay ?? 30000);
       const contactDelayMs = Number(campaign?.contactDelay ?? 0);
 
+      log(
+        'CAMPAIGN',
+        `[${campaignId}] Loop tick → delay=${delayMs}ms | contactDelay=${contactDelayMs}ms | status=${campaign.status}`
+      );
+
       const claim = await claimNextContactBatch(campaignId);
 
       if (!claim || !claim.batch?.length) {
         // Nada pronto agora: termina o loop dessa campanha.
-        console.log(
-          `✅ [${campaignId}] Sem pendentes prontos. Encerrando loop da campanha.`
+        log(
+          'CAMPAIGN',
+          `[${campaignId}] ✅ Sem pendentes prontos. Encerrando loop da campanha.`
         );
         return;
       }
@@ -239,8 +313,12 @@ async function processCampaign(campaignId) {
       const currentBrazilTime = DateTime.now()
         .setZone('America/Sao_Paulo')
         .toFormat('dd/MM/yyyy HH:mm:ss');
-      console.log(
-        `📦 [${campaignId}] Processando ${batch.length} mensagens do contato ${cleanNumber} (Horário Brasil: ${currentBrazilTime})`
+
+      log(
+        'SEND',
+        `[${campaignId}] Processando ${batch.length} mensagens do contato ${cleanNumber} (Horário BR: ${currentBrazilTime})`,
+        '| Dados contato:',
+        contactData
       );
 
       for (const dispatch of batch) {
@@ -248,6 +326,11 @@ async function processCampaign(campaignId) {
 
         try {
           let res;
+
+          log(
+            'SEND',
+            `[${campaignId}] Enviando tipo="${payload.type}" para ${cleanNumber} | dispatchId=${dispatch.id}`
+          );
 
           switch (payload.type) {
             case 'image':
@@ -313,15 +396,17 @@ async function processCampaign(campaignId) {
               where: { id: dispatch.id },
               data: { status: 'sent', error: null },
             });
-            console.log(
-              `✅ [${campaignId}] Enviado (${payload.type}) → ${cleanNumber}`
+            log(
+              'SEND',
+              `✅ [${campaignId}] Enviado (${payload.type}) → ${cleanNumber} | dispatchId=${dispatch.id}`
             );
           } else {
             throw new Error(res?.data?.message || 'Falha no envio');
           }
         } catch (err) {
-          console.error(
-            `❌ [${campaignId}] Erro ao enviar para ${cleanNumber}:`,
+          error(
+            'SEND',
+            `[${campaignId}] Erro ao enviar para ${cleanNumber} (dispatchId=${dispatch.id}):`,
             err.message
           );
           try {
@@ -330,14 +415,17 @@ async function processCampaign(campaignId) {
               data: { status: 'failed', error: String(err.message || err) },
             });
           } catch (e) {
-            console.error('⚠️ Erro ao marcar como failed:', e.message);
+            error('SEND', 'Erro ao marcar como failed:', e.message);
           }
         }
 
         // Delay entre mensagens do mesmo contato
         if (delayMs > 0) {
-          console.log(
-            `⏳ [${campaignId}] Aguardando ${Math.ceil(delayMs / 1000)}s...`
+          log(
+            'DELAY',
+            `[${campaignId}] Aguardando ${Math.ceil(
+              delayMs / 1000
+            )}s entre mensagens do mesmo contato`
           );
           await new Promise((resolve) => setTimeout(resolve, delayMs));
         }
@@ -345,16 +433,18 @@ async function processCampaign(campaignId) {
 
       // Delay entre contatos dessa campanha
       if (contactDelayMs > 0) {
-        console.log(
-          `⏳ [${campaignId}] Aguardando ${Math.ceil(
+        log(
+          'DELAY',
+          `[${campaignId}] Aguardando ${Math.ceil(
             contactDelayMs / 1000
-          )}s antes do próximo contato...`
+          )}s antes do próximo contato`
         );
         await new Promise((resolve) => setTimeout(resolve, contactDelayMs));
       }
     } catch (loopErr) {
-      console.error(
-        `💥 [${campaignId}] Erro no loop da campanha:`,
+      error(
+        'CAMPAIGN',
+        `[${campaignId}] Erro no loop da campanha:`,
         loopErr.message
       );
       // Evita loop quente em erro inesperado
@@ -368,7 +458,6 @@ async function processCampaign(campaignId) {
  * inicia um loop por campanha (em paralelo), respeitando MAX_CAMPAIGN_CONCURRENCY.
  */
 const runningCampaigns = new Set();
-const ORCHESTRATOR_TICK_MS = Number(process.env.ORCHESTRATOR_TICK_MS || 3000);
 
 async function orchestrate() {
   await reviveStuckProcessing();
@@ -379,9 +468,12 @@ async function orchestrate() {
     const currentBrazilTime = DateTime.now()
       .setZone('America/Sao_Paulo')
       .toFormat('dd/MM/yyyy HH:mm:ss');
-    console.log(
-      `🕐 Orquestrador executando - Horário Brasil: ${currentBrazilTime}`
+
+    log(
+      'ORCHESTRATOR',
+      `🕐 Tick do orquestrador - Horário Brasil: ${currentBrazilTime}`
     );
+
     const rows = await prisma.campaignDispatch.findMany({
       where: {
         status: 'pending',
@@ -400,32 +492,66 @@ async function orchestrate() {
 
     const availableCampaigns = rows.map((r) => r.campaignId);
 
+    log(
+      'ORCHESTRATOR',
+      'Campanhas com pendências:',
+      availableCampaigns,
+      '| Já em execução:',
+      Array.from(runningCampaigns)
+    );
+
     for (const campaignId of availableCampaigns) {
-      if (runningCampaigns.has(campaignId)) continue;
+      if (runningCampaigns.has(campaignId)) {
+        log(
+          'ORCHESTRATOR',
+          `Campanha ${campaignId} já está em execução. Pulando...`
+        );
+        continue;
+      }
 
       if (
         MAX_CAMPAIGN_CONCURRENCY > 0 &&
         runningCampaigns.size >= MAX_CAMPAIGN_CONCURRENCY
       ) {
+        warn(
+          'ORCHESTRATOR',
+          `Limite de concorrência atingido (${MAX_CAMPAIGN_CONCURRENCY}). Aguardando próximo tick.`
+        );
         break; // limite global atingido
       }
 
+      log('ORCHESTRATOR', `▶️ Iniciando campanha ${campaignId}`);
       runningCampaigns.add(campaignId);
+
       processCampaign(campaignId)
         .catch((e) =>
-          console.error(`💥 Erro no processCampaign(${campaignId}):`, e.message)
+          error(
+            'ORCHESTRATOR',
+            `Erro no processCampaign(${campaignId}):`,
+            e.message
+          )
         )
         .finally(() => {
           runningCampaigns.delete(campaignId);
+          log(
+            'ORCHESTRATOR',
+            `⏹ Campanha finalizada/removida do set: ${campaignId}`
+          );
         });
     }
   } catch (err) {
-    console.error('⚠️ Erro no orchestrate:', err.message);
+    error('ORCHESTRATOR', 'Erro no orchestrate:', err.message);
   } finally {
+    log('ORCHESTRATOR', `Agendando próximo tick em ${ORCHESTRATOR_TICK_MS}ms`);
     setTimeout(orchestrate, ORCHESTRATOR_TICK_MS);
   }
 }
 
-// Inicia o orquestrador
+/** BOOT */
+log('BOOT', 'WHATSAPP_EXTERNAL_API:', WHATSAPP_EXTERNAL_API);
+log('BOOT', 'MAX_CAMPAIGN_CONCURRENCY:', MAX_CAMPAIGN_CONCURRENCY);
+log('BOOT', 'PROCESSING_TTL_MS:', PROCESSING_TTL_MS);
+log('BOOT', 'ORCHESTRATOR_TICK_MS:', ORCHESTRATOR_TICK_MS);
+log('BOOT', '🧽 CampaignWorker (multi-campanhas paralelas) iniciando...');
+
 orchestrate();
-console.log('🧽 CampaignWorker (multi-campanhas paralelas) iniciado!');

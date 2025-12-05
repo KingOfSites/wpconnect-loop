@@ -1,550 +1,1258 @@
 generator client {
-  provider = "prisma-client-js"
+    provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+    provider = "mysql"
+    url      = env("DATABASE_URL")
 }
 
 model User {
-  id                  String    @id @default(cuid())
-  name                String
-  email               String    @unique
-  phone               String
-  profession          String
-  password            String
-  googleAccessToken   String?
-  googleEmail         String?
-  googleRefreshToken  String?
-  resetPasswordExpiry DateTime?
-  resetPasswordToken  String?
+    id                       Int                       @id @default(autoincrement())
+    name                     String?
+    email                    String                    @unique
+    password                 String
+    image_url                String?
+    role                     Role                      @default(SUBSCRIBER)
+    phoneNumber              String?
+    createdAt                DateTime                  @default(now())
+    permissions              Json?
+    updatedAt                DateTime                  @updatedAt
+    appleId                  String?
+    AccessLog                AccessLog[]
+    createdEvents            CalendarEvent[]           @relation("CalendarEventCreator")
+    Campaing                 Campaing[]
+    clients                  Client[]                  @relation("ClientCreator")
+    clientesDirecionados     Client[]                  @relation("ClientVendedor")
+    clientLogs               ClientLog[]
+    ClientStatusHistory      ClientStatusHistory[]
+    ClientWppSession         ClientWppSession[]
+    cobrancasCobrador        CobrancaCobrador[]        @relation("CobradorCobrancas")
+    financeiroVerificacoes   CobrancaCobrador[]        @relation("FinanceiroVerificacoes")
+    extratosUpload           Extrato[]                 @relation("ExtratoUploadedBy")
+    fichasCadastradas        FichaCadastro[]           @relation("FichaCadastroColetor")
+    contestacoesFeitas       HistoricoContestacao[]    @relation("ContestacaoContestador")
+    contestacoesRevisadas    HistoricoContestacao[]    @relation("ContestacaoRevisor")
+    historicosRealizados     HistoricoSorteio[]        @relation("HistoricoSorteioRealizador")
+    internalChatsAsUser1     InternalChat[]            @relation("InternalChatUser1")
+    internalChatsAsUser2     InternalChat[]            @relation("InternalChatUser2")
+    internalChatParticipants InternalChatParticipant[] @relation("InternalChatParticipants")
+    internalMessages         InternalMessage[]         @relation("InternalMessageSender")
+    observacoes              Observacao[]              @relation("ObservacaoUsuario")
+    Sorteio                  Sorteio[]
+    UserLocation             UserLocation[]
+    VerificacaoPresencial    VerificacaoPresencial[]
+    whatsappContactsAssigned WhatsAppContact[]         @relation("WhatsAppContactAssigned")
+    WhatsAppSession          WhatsAppSession[]
+
+    @@index([role], map: "User_role_fkey")
 }
 
-model Company {
-  id      String @id @default(cuid())
-  name    String
-  cnpj    String
-  phone   String
-  address String
+model AccessLog {
+    id          Int        @id @default(autoincrement())
+    userId      Int?
+    ip          String
+    city        String?
+    browser     String
+    deviceType  DeviceType
+    isIphone    Boolean
+    createdAt   DateTime   @default(now())
+    deviceBrand String?
+    deviceModel String?
+    user        User?      @relation(fields: [userId], references: [id])
+
+    @@index([userId], map: "AccessLog_userId_fkey")
 }
 
-model Team {
-  id                  String            @id @default(cuid())
-  name                String
-  email               String            @unique
-  position            String
-  password            String?
-  teamId              String?
-  googleAccessToken   String?           @db.Text
-  googleEmail         String?
-  googleRefreshToken  String?           @db.Text
-  directorId          String?
-  avatarUrl           String?
-  address             String?
-  birthDate           String?
-  cnpj                String?
-  cpf                 String?           @default("")
-  phone               String?           @default("")
-  accessStatus        String?           @default("pending")
-  approvedAt          DateTime?
-  createdAt           DateTime?         @default(now())
-  requestedAt         DateTime?         @default(now())
-  updatedAt           DateTime?
-  resetPasswordExpiry DateTime?
-  resetPasswordToken  String?
-  companyAddress      String?
-  companyCnpj         String?
-  companyDescription  String?
-  companyEmail        String?
-  companyEmployees    String?
-  companyFounded      String?
-  companyLogo         String?
-  companyName         String?
-  companyPhone        String?
-  companyRevenue      String?
-  companySector       String?
-  companySize         String?
-  companyWebsite      String?
-  campaigns           Campaing[]
-  leads               Lead[]            @relation("LeadCreator")
-  meetings            Meeting[]
-  proposals           Proposal[]        @relation("ProposalCreator")
-  QuickReply          QuickReply[]
-  segments            Segment[]
-  team                TeamGroup?        @relation("TeamMember", fields: [teamId], references: [id])
-  managedTeams        TeamGroup[]       @relation("TeamManager")
-  permissions         TeamPermission[]
-  Template            Template[]
-  whatsappSessions    WhatsAppSession[]
+model Client {
+    id                                 Int                     @id @default(autoincrement())
+    name                               String
+    email                              String
+    cpf                                String
+    phone                              String
+    status                             Client_status           @default(PENDENTE)
+    createdAt                          DateTime                @default(now())
+    updatedAt                          DateTime                @updatedAt
+    criadoPor                          Int?
+    agendamentoAtendimento             DateTime?
+    banco                              String?
+    certidaoCasamentoUrl               Json?
+    chavePix                           String?
+    comprovanteRendaUrl                Json?
+    creditoSolicitado                  Float                   @default(0)
+    dataVencimento                     DataVencimento          @default(DIA_05)
+    debitoAnexo                        Json?
+    debitosCpf                         String?                 @db.Text
+    destinatarioPix                    String?
+    documentoFotoUrl                   Json?
+    empresa                            String?
+    fonteRenda                         Client_fonteRenda       @default(REGISTRADO)
+    horarioTrabalho                    String?
+    mediaExtratos                      Float?
+    quantidadeParcelas                 Int                     @default(12)
+    resumoChatgpt                      String?                 @db.Text
+    rg                                 String?
+    somaExtratos                       Float?
+    tipoNegociacao                     Client_tipoNegociacao   @default(NOVA)
+    valorLiquidoRecebido               Float?
+    arquivoContratoUrl                 Json?
+    contratoAssinadoDigitalUrl         Json?
+    dataAtendimento                    DateTime?
+    dataAtendimentoDoutor              DateTime?
+    dataLiberacaoPagamento             DateTime?
+    dataVencimentoBoleto               DateTime?
+    linkBoleto                         String?                 @db.Text
+    pdfBoletoUrl                       String?                 @db.Text
+    statusAtendimentoDoutor            String?                 @default("AGENDADO")
+    valorBoleto                        Float?
+    valorLiberado                      Float?
+    comprovantePagamentoUrl            String?                 @db.Text
+    boletosGeradosUrl                  Json?
+    dataVencimentoRenegociacao         DataVencimento?
+    horarioAtendimentoRenegociacao     String?
+    linkBoletosAsaas                   String?                 @db.Text
+    precisaDoutor                      Boolean?                @default(false)
+    quantidadeParcelasAprovadas        Int?
+    resumoBoletosPagos                 String?                 @db.Text
+    valorLiberadoRenegociacao          Float?
+    valorParcelaRenegociacao           Float?
+    agendamentoAtendimentoRenegociacao DateTime?
+    dataDirecionamentoGerente          DateTime?
+    direcionadoParaVendedor            Int?
+    valorParcela                       Float?
+    mesPrimeiroPagamento               String?
+    fotoSegurandoPromissoriaUrl        Json?
+    fotoPromissoriaAssinadaUrl         Json?
+    contestadoPor                      Int?
+    dataContestacao                    DateTime?
+    dataRevisaoContestacao             DateTime?
+    revisadoPor                        Int?
+    dataNaoQuis                        DateTime?
+    dataParouResponder                 DateTime?
+    statusAnteriorParouResponder       Client_status?
+    solicitacaoTrocaBoleto             Boolean?                @default(false)
+    motivoTrocaBoleto                  String?                 @db.Text
+    dataSolicitacaoTrocaBoleto         DateTime?
+    solicitadoPor                      Int?
+    whatsappChatId                     String?
+    whatsappContactId                  String?
+    whatsappSessionName                String?
+    boletoTrocadoPor                   Int?
+    dataTrocaBoleto                    DateTime?
+    boletoTrocado                      Boolean?                @default(false)
+    clientIdOriginal                   Int?
+    events                             CalendarEvent[]
+    clienteOriginal                    Client?                 @relation("RenegociacaoCliente", fields: [clientIdOriginal], references: [id])
+    renegociacoes                      Client[]                @relation("RenegociacaoCliente")
+    criador                            User?                   @relation("ClientCreator", fields: [criadoPor], references: [id])
+    vendedorDirecionado                User?                   @relation("ClientVendedor", fields: [direcionadoParaVendedor], references: [id])
+    logs                               ClientLog[]
+    ClientStatusHistory                ClientStatusHistory[]
+    ClientWppSession                   ClientWppSession[]
+    historicoContestacoes              HistoricoContestacao[]
+    observacoes                        Observacao[]
+    referencias                        Referencia[]
+    residencias                        Residencia[]
+    UserLocation                       UserLocation[]
+    VerificacaoPresencial              VerificacaoPresencial[]
 
-  @@index([teamId], map: "Team_teamId_fkey")
-  @@index([directorId], map: "Team_directorId_fkey")
+    @@index([email])
+    @@index([cpf])
+    @@index([fonteRenda])
+    @@index([criadoPor])
+    @@index([direcionadoParaVendedor], map: "Client_direcionadoParaVendedor_fkey")
+    @@index([whatsappChatId])
+    @@index([whatsappContactId])
+    @@index([whatsappSessionName])
+    @@index([clientIdOriginal])
 }
 
-model TeamGroup {
-  id        String   @id @default(cuid())
-  name      String
-  managerId String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  members   Team[]   @relation("TeamMember")
-  manager   Team     @relation("TeamManager", fields: [managerId], references: [id])
+model Residencia {
+    id                        Int            @id @default(autoincrement())
+    cidade                    String         @default("")
+    cep                       String         @default("")
+    bairro                    String         @default("")
+    endereco                  String         @default("")
+    numero                    String?
+    complemento               String?
+    enderecoEmpresa           String?        @db.Text
+    estado                    String         @default("")
+    comprovanteEnderecoUrl    Json?
+    clientId                  Int
+    createdAt                 DateTime       @default(now())
+    updatedAt                 DateTime       @updatedAt
+    clienteGoogleMaps         String?        @db.Text
+    clienteFotoResidenciaUrl  Json?
+    selfieResidenciaUrl       Json?
+    iptuUrl                   Json?
+    observacaoResidencia      String?        @db.Text
+    statusCliente             StatusCliente?
+    valorFinanciamentoAluguel Float?
+    contratoAluguelUrl        String?        @db.Text
+    confirmacaoAluguelUrl     Json?
+    donoResidenciaNome        String?
+    donoResidenciaTelefone    String?
+    client                    Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
-  @@index([managerId], map: "TeamGroup_managerId_fkey")
+    @@index([clientId])
 }
 
-model TeamPermission {
-  id            String  @id @default(cuid())
-  teamId        String
-  role          String
-  dashboard     Boolean @default(false)
-  whatsapp      Boolean @default(false)
-  propostas     Boolean @default(false)
-  simuladores   Boolean @default(false)
-  relatorios    Boolean @default(false)
-  campanhas     Boolean @default(false)
-  equipe        Boolean @default(false)
-  configuracoes Boolean @default(false)
-  team          Team    @relation(fields: [teamId], references: [id])
+model Referencia {
+    id         Int      @id @default(autoincrement())
+    clientId   Int
+    nome       String?  @db.Text
+    telefone   String?
+    parentesco String?
+    rua        String?
+    numero     String?
+    bairro     String?
+    cidade     String?
+    estado     String?
+    cep        String?
+    googleMaps String?  @db.Text
+    fotoUrl    Json?
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
+    client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
-  @@index([teamId], map: "TeamPermission_teamId_fkey")
+    @@index([clientId])
 }
 
-model Lead {
-  id             String       @id @default(cuid())
-  name           String
-  email          String?
-  phone          String
-  ocupation      String
-  potentialValue String
-  observations   String
-  status         String       @default("novos_leads")
-  product        String?
-  createdAt      DateTime     @default(now())
-  createdBy      String?
-  updatedAt      DateTime?    @updatedAt
-  deletedAt      DateTime?
-  followups      Followup[]
-  creator        Team?        @relation("LeadCreator", fields: [createdBy], references: [id])
-  LeadFile       LeadFile[]
-  Meeting        Meeting[]
-  proposals      Proposal[]
-  simulations    Simulation[]
+model Observacao {
+    id             Int                   @id @default(autoincrement())
+    clientId       Int
+    userId         Int?
+    tipoUsuario    TipoUsuarioObservacao
+    tipoObservacao TipoObservacao
+    conteudo       String                @db.Text
+    motivo         String?               @db.Text
+    statusCliente  String?
+    createdAt      DateTime              @default(now())
+    updatedAt      DateTime              @updatedAt
+    client         Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+    usuario        User?                 @relation("ObservacaoUsuario", fields: [userId], references: [id])
 
-  @@index([createdBy])
+    @@index([clientId])
+    @@index([userId])
+    @@index([tipoUsuario])
+    @@index([tipoObservacao])
+    @@index([createdAt])
+    @@index([statusCliente])
 }
 
-model Proposal {
-  id                  String         @id @default(cuid())
-  title               String
-  client              String
-  company             String
-  value               String
-  stage               String         @default("pendente_envio")
-  priority            String         @default("medium")
-  dueDate             String?
-  description         String?
-  phone               String
-  email               String
-  leadId              String
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime?      @updatedAt
-  arquivoUrl          String?
-  createdBy           String?
-  acrescentarSeguro   Boolean?
-  creditoUnitario     Float?
-  mesContemplacao     Int?
-  opcaoParcela        String?
-  parcelaContemplacao Float?
-  prazoConsorcio      Int?
-  taxa                Float?
-  imoveis             Property[]
-  proponentes         Proponent[]
-  creator             Team?          @relation("ProposalCreator", fields: [createdBy], references: [id])
-  lead                Lead           @relation(fields: [leadId], references: [id])
-  arquivos            ProposalFile[]
-  simulacoes          Simulation[]
+model VerificacaoPresencial {
+    id                    Int            @id @default(autoincrement())
+    clientId              Int
+    verificadoPor         Int?
+    createdAt             DateTime       @default(now())
+    updatedAt             DateTime       @updatedAt
+    audioPrincipal        String?        @db.Text
+    audiosExtras          Json?
+    consideracoesCobrador String?        @db.Text
+    consideracoesFinais   String?        @db.Text
+    dataCobranca          DateTime
+    dataPagamento         DateTime
+    fotosLocal            Json?
+    numeroParcela         Int
+    ondeFoiCobrado        OndeFoiCobrado
+    outrosAnexos          Json?
+    pixEnviado            String?        @db.Text
+    printsWhatsapp        Json?
+    quemFoiCobrado        QuemFoiCobrado
+    statusCobranca        StatusCobranca
+    valorPago             Float
+    valorParcela          Float
+    vencimentoParcela     DateTime
+    client                Client         @relation(fields: [clientId], references: [id])
+    usuario               User?          @relation(fields: [verificadoPor], references: [id])
 
-  @@index([leadId], map: "Proposal_leadId_fkey")
-  @@index([createdBy])
+    @@index([clientId])
+    @@index([statusCobranca])
+    @@index([dataCobranca])
+    @@index([verificadoPor], map: "VerificacaoPresencial_verificadoPor_fkey")
 }
 
-model Proponent {
-  id             String   @id @default(cuid())
-  name           String
-  cpf            String
-  email          String
-  phone          String
-  proposalId     String
-  razaoSocial    String?
-  bairro         String?
-  cep            String?
-  cidadeUf       String?
-  endereco       String?
-  nomeEmpresa    String?
-  cnpj           String?
-  dataNascimento String?
-  ocupacao       String?
-  rendaMensal    String?
-  proposal       Proposal @relation(fields: [proposalId], references: [id])
+model InternalChat {
+    id           String                    @id @default(uuid())
+    type         InternalChatType
+    title        String
+    description  String?
+    isActive     Boolean                   @default(true)
+    createdAt    DateTime                  @default(now())
+    updatedAt    DateTime                  @updatedAt
+    isPrivate    Boolean                   @default(false)
+    user1Id      Int?
+    user2Id      Int?
+    user1        User?                     @relation("InternalChatUser1", fields: [user1Id], references: [id])
+    user2        User?                     @relation("InternalChatUser2", fields: [user2Id], references: [id])
+    participants InternalChatParticipant[]
+    messages     InternalMessage[]
 
-  @@index([proposalId], map: "Proponent_proposalId_fkey")
+    @@index([type])
+    @@index([isActive])
+    @@index([isPrivate])
+    @@index([user1Id])
+    @@index([user2Id])
 }
 
-model Property {
-  id            String          @id @default(cuid())
-  address       String
-  value         String
-  description   String?
-  proposalId    String
-  creditValue   String?
-  neighborhood  String?
-  type          String?
-  zipCode       String?
-  proposal      Proposal        @relation(fields: [proposalId], references: [id])
-  PropertyOwner PropertyOwner[]
+model InternalMessage {
+    id        String       @id @default(uuid())
+    content   String       @db.Text
+    chatId    String
+    senderId  Int
+    readBy    Json?
+    createdAt DateTime     @default(now())
+    updatedAt DateTime     @updatedAt
+    chat      InternalChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+    sender    User         @relation("InternalMessageSender", fields: [senderId], references: [id])
 
-  @@index([proposalId], map: "Property_proposalId_fkey")
+    @@index([chatId])
+    @@index([senderId])
+    @@index([createdAt])
 }
 
-model ProposalFile {
-  id           String   @id @default(cuid())
-  url          String?  @db.Text
-  name         String
-  proposalId   String
-  createdAt    DateTime @default(now())
-  documentType String?
-  fileData     Bytes?
-  mimeType     String?
-  originalName String?
-  size         Int?
-  proposal     Proposal @relation(fields: [proposalId], references: [id])
+model InternalChatParticipant {
+    id            String       @id @default(uuid())
+    chatId        String
+    userId        Int
+    joinedAt      DateTime     @default(now())
+    lastReadAt    DateTime?
+    isActive      Boolean      @default(true)
+    canWrite      Boolean      @default(true)
+    notifications Boolean      @default(true)
+    chat          InternalChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+    user          User         @relation("InternalChatParticipants", fields: [userId], references: [id])
 
-  @@index([proposalId], map: "ProposalFile_proposalId_fkey")
+    @@unique([chatId, userId])
+    @@index([chatId])
+    @@index([userId])
 }
 
-model Meeting {
-  id             String   @id @default(cuid())
-  title          String
-  description    String?
-  startDateTime  DateTime
-  endDateTime    DateTime
-  duration       Int      @default(60)
-  type           String   @default("meet")
-  status         String   @default("confirmed")
-  meetLink       String?
-  attendees      String?
-  organizerEmail String
-  googleEventId  String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  leadId         String?
-  Lead           Lead?    @relation(fields: [leadId], references: [id])
-  organizer      Team     @relation(fields: [organizerEmail], references: [email])
+model CalendarEvent {
+    id          String   @id @default(uuid())
+    title       String
+    description String?  @db.Text
+    startDate   DateTime
+    endDate     DateTime
+    clientId    Int?
+    createdBy   Int
+    isActive    Boolean  @default(true)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+    client      Client?  @relation(fields: [clientId], references: [id])
+    creator     User     @relation("CalendarEventCreator", fields: [createdBy], references: [id])
 
-  @@index([organizerEmail])
-  @@index([startDateTime])
-  @@index([googleEventId])
-  @@index([leadId])
-}
-
-model Followup {
-  id              String   @id @default(cuid())
-  observations    String
-  tipeOfContact   String
-  date            DateTime
-  dateNextContact DateTime
-  leadId          String
-  lead            Lead     @relation(fields: [leadId], references: [id])
-
-  @@index([leadId], map: "Followup_leadId_fkey")
-}
-
-model Simulation {
-  id                  String    @id @default(cuid())
-  creditoUnitario     Float
-  taxa                Float
-  prazoConsorcio      Int
-  opcaoParcela        String
-  parcelaContemplacao Float?
-  mesContemplacao     Int?
-  acrescentarSeguro   Boolean
-  createdAt           DateTime  @default(now())
-  proposalId          String?
-  leadId              String?
-  lead                Lead?     @relation(fields: [leadId], references: [id])
-  proposal            Proposal? @relation(fields: [proposalId], references: [id])
-
-  @@index([proposalId], map: "Simulation_proposalId_fkey")
-  @@index([leadId], map: "Simulation_leadId_fkey")
-}
-
-model Chat {
-  id          String  @id
-  idfromWpp   String  @db.Text
-  body        String? @db.Text
-  timestamp   String?
-  notifyName  String?
-  from        String?
-  to          String?
-  contactName String?
-  foto        String?
-  mediaUrl    String?
+    @@index([startDate])
+    @@index([clientId])
+    @@index([createdBy])
 }
 
 model WhatsAppSession {
-  id               String            @id @default(uuid())
-  sessionName      String            @unique
-  isActive         Boolean           @default(true)
-  connectionStatus String            @default("DISCONNECTED")
-  qrCode           String?           @db.Text
-  lastConnected    DateTime?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  formattedNumber  String?
-  phoneNumber      String?
-  userId           String?
-  deletedAt        DateTime?
-  contacts         WhatsAppContact[]
-  messages         WhatsAppMessage[]
-  user             Team?             @relation(fields: [userId], references: [id])
+    id               String             @id @default(uuid())
+    sessionName      String             @unique
+    isActive         Boolean            @default(true)
+    connectionStatus String             @default("DISCONNECTED")
+    qrCode           String?            @db.Text
+    lastConnected    DateTime?
+    createdAt        DateTime           @default(now())
+    updatedAt        DateTime           @updatedAt
+    cobradorSession  Boolean?           @default(false)
+    userId           Int?
+    ClientWppSession ClientWppSession[]
+    contacts         WhatsAppContact[]
+    messages         WhatsAppMessage[]
+    user             User?              @relation(fields: [userId], references: [id])
 
-  @@index([sessionName])
-  @@index([isActive])
-  @@index([userId])
+    @@index([sessionName])
+    @@index([isActive])
+    @@index([userId], map: "WhatsAppSession_userId_fkey")
 }
 
 model WhatsAppContact {
-  id               String               @id @default(uuid())
-  phone            String
-  formattedPhone   String
-  name             String?
-  profilePic       String?              @db.Text
-  isGroup          Boolean              @default(false)
-  sessionId        String
-  assignedToUserId Int?
-  assignedAt       DateTime?
-  lastMessageAt    DateTime?
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
-  archived         Boolean              @default(false)
-  session          WhatsAppSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  tags             WhatsAppContactTag[]
-  messages         WhatsAppMessage[]
+    id               String               @id @default(uuid())
+    phone            String
+    formattedPhone   String
+    name             String?
+    profilePic       String?              @db.Text
+    isGroup          Boolean              @default(false)
+    sessionId        String
+    assignedToUserId Int?
+    assignedAt       DateTime?
+    lastMessageAt    DateTime?
+    createdAt        DateTime             @default(now())
+    updatedAt        DateTime             @updatedAt
+    assignedTo       User?                @relation("WhatsAppContactAssigned", fields: [assignedToUserId], references: [id])
+    session          WhatsAppSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+    tags             WhatsAppContactTag[]
+    messages         WhatsAppMessage[]
 
-  @@unique([phone, sessionId])
-  @@index([phone])
-  @@index([sessionId])
-  @@index([assignedToUserId])
-  @@index([lastMessageAt])
+    @@unique([phone, sessionId])
+    @@index([phone])
+    @@index([sessionId])
+    @@index([assignedToUserId])
+    @@index([lastMessageAt])
 }
 
 model WhatsAppMessage {
-  id           String           @id @default(uuid())
-  messageId    String           @unique
-  chatId       String
-  sessionId    String
-  contactId    String?
-  contactPhone String?
-  fromMe       Boolean
-  timestamp    DateTime
-  type         String           @default("text")
-  body         String?          @db.Text
-  quotedMsgId  String?
-  mediaUrl     String?          @db.LongText
-  mediaType    String?
-  fileName     String?
-  caption      String?          @db.Text
-  isForwarded  Boolean          @default(false)
-  isStatus     Boolean          @default(false)
-  isGroupMsg   Boolean          @default(false)
-  author       String?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-  archived     Boolean          @default(false)
-  contact      WhatsAppContact? @relation(fields: [contactId], references: [id])
-  session      WhatsAppSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+    id           String           @id @default(uuid())
+    messageId    String           @unique
+    chatId       String
+    sessionId    String
+    contactId    String?
+    contactPhone String?
+    fromMe       Boolean
+    timestamp    DateTime
+    type         String           @default("text")
+    body         String?          @db.Text
+    quotedMsgId  String?
+    mediaUrl     String?          @db.LongText
+    mediaType    String?
+    fileName     String?
+    caption      String?          @db.Text
+    isForwarded  Boolean          @default(false)
+    isStatus     Boolean          @default(false)
+    isGroupMsg   Boolean          @default(false)
+    author       String?
+    createdAt    DateTime         @default(now())
+    updatedAt    DateTime         @updatedAt
+    contact      WhatsAppContact? @relation(fields: [contactId], references: [id])
+    session      WhatsAppSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
-  @@index([messageId])
-  @@index([chatId])
-  @@index([sessionId])
-  @@index([contactId])
-  @@index([contactPhone])
-  @@index([timestamp])
-  @@index([fromMe])
+    @@index([messageId])
+    @@index([chatId])
+    @@index([sessionId])
+    @@index([contactId])
+    @@index([contactPhone])
+    @@index([timestamp])
+    @@index([fromMe])
 }
 
 model WhatsAppTag {
-  id        String               @id @default(uuid())
-  name      String               @unique
-  color     String               @default("#007bff")
-  createdAt DateTime             @default(now())
-  updatedAt DateTime             @updatedAt
-  contacts  WhatsAppContactTag[]
+    id        String               @id @default(uuid())
+    name      String               @unique
+    color     String               @default("#007bff")
+    createdAt DateTime             @default(now())
+    updatedAt DateTime             @updatedAt
+    contacts  WhatsAppContactTag[]
 
-  @@index([name])
+    @@index([name])
 }
 
 model WhatsAppContactTag {
-  id        String          @id @default(uuid())
-  contactId String
-  tagId     String
-  createdAt DateTime        @default(now())
-  contact   WhatsAppContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  tag       WhatsAppTag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+    id        String          @id @default(uuid())
+    contactId String
+    tagId     String
+    createdAt DateTime        @default(now())
+    contact   WhatsAppContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+    tag       WhatsAppTag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
-  @@unique([contactId, tagId])
-  @@index([contactId])
-  @@index([tagId])
+    @@unique([contactId, tagId])
+    @@index([contactId])
+    @@index([tagId])
+}
+
+model FichaCadastro {
+    id             Int                      @id @default(autoincrement())
+    numero         String                   @unique
+    nome           String
+    cpf            String                   @unique
+    endereco       String
+    whatsapp       String
+    tipoResidencia TipoResidencia
+    fonteRenda     FichaCadastro_fonteRenda
+    mediaSalarial  Float
+    arquivosUrl    Json?
+    criadoPor      Int
+    createdAt      DateTime                 @default(now())
+    updatedAt      DateTime                 @updatedAt
+    bairro         String?
+    cep            String?
+    cidade         String?
+    complemento    String?
+    estado         String?
+    rua            String?
+    numeroEndereco String?
+    coletor        User                     @relation("FichaCadastroColetor", fields: [criadoPor], references: [id])
+
+    @@index([cpf])
+    @@index([numero])
+    @@index([criadoPor])
+}
+
+model Cobranca {
+    id                     Int                @id @default(autoincrement())
+    clienteNome            String
+    clienteEmail           String?
+    clienteCpf             String?
+    clientePhone           String?
+    valorOriginal          Float
+    valorAtualizado        Float?
+    valorLiquido           Float?
+    juros                  Float              @default(0)
+    multa                  Float              @default(0)
+    desconto               Float              @default(0)
+    dataVencimento         DateTime
+    dataVencimentoOriginal DateTime?
+    dataPagamento          DateTime?
+    dataEstimadaCredito    DateTime?
+    dataConfirmacao        DateTime?
+    dataCredito            DateTime?
+    dataPromissoria        DateTime?
+    status                 Cobranca_status    @default(PENDENTE)
+    numeroDocumento        String?
+    numeroBoleto           String?
+    numeroFatura           String?
+    descricao              String?
+    identificadorExterno   String?
+    emailsAdicionais       String?
+    formaPagamento         String?
+    tipoCobranca           String?
+    grupos                 String?
+    usuario                String?
+    uploadId               String?
+    observacoes            String?
+    audioUrl               String?            @db.Text
+    resumoCobranca         String?            @db.Text
+    fotoResidenciaUrl      String?            @db.Text
+    createdAt              DateTime           @default(now())
+    updatedAt              DateTime           @updatedAt
+    cobrancasCobrador      CobrancaCobrador[]
+
+    @@index([clienteCpf])
+    @@index([clienteEmail])
+    @@index([status])
+    @@index([dataVencimento])
+    @@index([uploadId])
+}
+
+model CobrancaCobrador {
+    id                           Int                     @id @default(autoincrement())
+    cobrancaId                   Int
+    cobradorId                   Int
+    status                       CobrancaCobrador_status
+    observacoes                  String?                 @db.Text
+    dataPromissoria              DateTime?
+    resumoCobranca               String?                 @db.Text
+    dataCobranca                 DateTime                @default(now())
+    tipoContato                  Json?
+    resultadoCobranca            ResultadoCobranca
+    proximaAcao                  String?                 @db.Text
+    formaPagamento               String?
+    createdAt                    DateTime                @default(now())
+    updatedAt                    DateTime                @updatedAt
+    comprovantePagamentoUrl      String?                 @db.Text
+    dataVerificacaoFinanceiro    DateTime?
+    financeiroId                 Int?
+    observacoesFinanceiro        String?                 @db.Text
+    precisaVerificacaoFinanceiro Boolean                 @default(false)
+    verificadoPorFinanceiro      Boolean                 @default(false)
+    totalParcelas                Int?
+    ultimaParcela                DateTime?
+    valorParcialPago             Float?
+    valorRestante                Float?
+    audioUrls                    Json?
+    fotoResidenciaUrls           Json?
+    comprovantePagamentoUrls     Json?
+    printsWhatsappUrls           Json?
+    valorPago                    Float?
+    cobrador                     User                    @relation("CobradorCobrancas", fields: [cobradorId], references: [id])
+    cobranca                     Cobranca                @relation(fields: [cobrancaId], references: [id], onDelete: Cascade)
+    financeiro                   User?                   @relation("FinanceiroVerificacoes", fields: [financeiroId], references: [id])
+
+    @@index([cobrancaId])
+    @@index([cobradorId])
+    @@index([dataCobranca])
+    @@index([status])
+    @@index([precisaVerificacaoFinanceiro])
+    @@index([verificadoPorFinanceiro])
+    @@index([financeiroId], map: "CobrancaCobrador_financeiroId_fkey")
+}
+
+model Extrato {
+    id              Int           @id @default(autoincrement())
+    dataTransacao   DateTime
+    historico       String        @db.Text
+    descricao       String?       @db.Text
+    numeroDocumento String?
+    valor           Float
+    tipoMovimento   TipoMovimento
+    categoria       String?
+    saldoAnterior   Float?
+    saldoAtual      Float?
+    banco           String?
+    agencia         String?
+    conta           String?
+    cpfCnpj         String?
+    nomeContraparte String?
+    codigoOperacao  String?
+    uploadId        String?
+    arquivoOriginal String?
+    uploadedBy      Int?
+    observacoes     String?       @db.Text
+    createdAt       DateTime      @default(now())
+    updatedAt       DateTime      @updatedAt
+    usuario         User?         @relation("ExtratoUploadedBy", fields: [uploadedBy], references: [id])
+
+    @@index([dataTransacao])
+    @@index([tipoMovimento])
+    @@index([uploadId])
+    @@index([uploadedBy])
+}
+
+model CobrancaUpload {
+    id                    Int      @id @default(autoincrement())
+    nomeArquivo           String
+    quantidadeCriadas     Int      @default(0)
+    quantidadeAtualizadas Int      @default(0)
+    quantidadeTotal       Int      @default(0)
+    uploadId              String   @unique
+    createdAt             DateTime @default(now())
+
+    @@index([createdAt])
+    @@index([uploadId])
+}
+
+model UserLocation {
+    id         Int      @id @default(autoincrement())
+    lat        Float
+    lng        Float
+    accuracy   Float?
+    address    String?  @db.VarChar(512)
+    recordedAt DateTime @default(now())
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime
+    userId     Int?
+    clientId   Int?
+    Client     Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+    User       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId, recordedAt])
+    @@index([clientId, recordedAt])
 }
 
 model Campaing {
-  id           String             @id @default(uuid())
-  name         String
-  delay        Int                @default(30000)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  contactDelay Int                @default(10000)
-  userId       String?
-  status       String             @default("active")
-  deletedAt    DateTime?
-  user         Team?              @relation(fields: [userId], references: [id])
-  templates    CampaingTemplate[]
+    id           String             @id @default(uuid())
+    name         String
+    delay        Int                @default(30000)
+    contactDelay Int                @default(10000)
+    createdAt    DateTime           @default(now())
+    updatedAt    DateTime           @updatedAt
+    userId       Int?
+    status       String             @default("active")
+    user         User?              @relation(fields: [userId], references: [id])
+    templates    CampaingTemplate[]
 
-  @@index([userId], map: "Campaing_userId_fkey")
+    @@index([userId], map: "Campaing_userId_fkey")
 }
 
 model Template {
-  id        String             @id @default(uuid())
-  name      String
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
-  deletedAt DateTime?
-  userId    String?
-  campaings CampaingTemplate[]
-  Team      Team?              @relation(fields: [userId], references: [id])
-  messages  TemplateMessage[]
-
-  @@index([userId], map: "Template_userId_fkey")
+    id        String             @id @default(uuid())
+    name      String
+    createdAt DateTime           @default(now())
+    updatedAt DateTime           @updatedAt
+    campaings CampaingTemplate[]
+    messages  TemplateMessage[]
 }
 
 model TemplateMessage {
-  id          String    @id @default(uuid())
-  text        String?   @db.Text
-  audioUrl    String?   @db.Text
-  imageUrl    String?   @db.Text
-  documentUrl String?   @db.Text
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  templateId  String
-  videoUrl    String?   @db.Text
-  deletedAt   DateTime?
-  template    Template  @relation(fields: [templateId], references: [id])
+    id          String   @id @default(uuid())
+    text        String?  @db.Text
+    audioUrl    String?  @db.Text
+    imageUrl    String?  @db.Text
+    videoUrl    String?  @db.Text
+    documentUrl String?  @db.Text
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+    templateId  String
+    template    Template @relation(fields: [templateId], references: [id])
 
-  @@index([templateId], map: "TemplateMessage_templateId_fkey")
+    @@index([templateId], map: "TemplateMessage_templateId_fkey")
 }
 
 model CampaingTemplate {
-  campaingId String
-  templateId String
-  campaing   Campaing @relation(fields: [campaingId], references: [id])
-  template   Template @relation(fields: [templateId], references: [id])
+    campaingId String
+    templateId String
+    campaing   Campaing @relation(fields: [campaingId], references: [id])
+    template   Template @relation(fields: [templateId], references: [id])
 
-  @@id([campaingId, templateId])
-  @@index([templateId], map: "CampaingTemplate_templateId_fkey")
-}
-
-model KbMessage {
-  id        String   @id @default(cuid())
-  userId    String
-  question  String
-  answer    String   @db.Text
-  citations Json?
-  createdAt DateTime @default(now())
-
-  @@index([userId, createdAt])
+    @@id([campaingId, templateId])
+    @@index([templateId], map: "CampaingTemplate_templateId_fkey")
 }
 
 model Segment {
-  id          String           @id @default(cuid())
-  name        String
-  description String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  userId      String
-  deletedAt   DateTime?
-  user        Team             @relation(fields: [userId], references: [id])
-  contacts    SegmentContact[]
+    id          String           @id @default(cuid())
+    name        String
+    description String?
+    createdAt   DateTime         @default(now())
+    updatedAt   DateTime         @updatedAt
+    userId      String
+    contacts    SegmentContact[]
 
-  @@index([userId], map: "Segment_userId_fkey")
+    @@index([userId], map: "Segment_userId_fkey")
 }
 
 model SegmentContact {
-  id        String  @id @default(cuid())
-  segmentId String
-  name      String?
-  phone     String
-  email     String?
-  empresa   String?
-  extraData Json?
-  segment   Segment @relation(fields: [segmentId], references: [id])
+    id        String  @id @default(cuid())
+    segmentId String
+    name      String?
+    phone     String
+    email     String?
+    empresa   String?
+    extraData Json?
+    segment   Segment @relation(fields: [segmentId], references: [id])
 
-  @@index([segmentId], map: "SegmentContact_segmentId_fkey")
+    @@index([segmentId], map: "SegmentContact_segmentId_fkey")
 }
 
 model CampaignDispatch {
-  id           String    @id @default(uuid())
-  campaignId   String
-  sessionName  String
-  contact      String
-  message      String    @db.Text
-  status       String    @default("pending")
-  error        String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  messageOrder Int?
-  scheduledAt  DateTime?
-  deletedAt    DateTime?
+    id           String    @id @default(uuid())
+    campaignId   String
+    sessionName  String
+    contact      String
+    message      String    @db.Text
+    status       String    @default("pending")
+    error        String?
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+    messageOrder Int?
+    scheduledAt  DateTime?
 }
 
-model LeadFile {
-  id           String   @id
-  url          String?  @db.Text
-  name         String
-  leadId       String
-  createdAt    DateTime @default(now())
-  documentType String?
-  fileData     Bytes?
-  mimeType     String?
-  originalName String?
-  size         Int?
-  Lead         Lead     @relation(fields: [leadId], references: [id])
+model ClientLog {
+    id         Int      @id @default(autoincrement())
+    clientId   Int
+    userId     Int
+    fieldName  String
+    oldValue   String?  @db.Text
+    newValue   String?  @db.Text
+    changeType String   @default("UPDATE")
+    createdAt  DateTime @default(now())
+    client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+    user       User     @relation(fields: [userId], references: [id])
 
-  @@index([leadId], map: "LeadFile_leadId_fkey")
+    @@index([clientId])
+    @@index([userId])
+    @@index([createdAt])
+    @@index([fieldName])
 }
 
-model PropertyOwner {
-  id         String    @id
-  name       String
-  propertyId String?
-  Property   Property? @relation(fields: [propertyId], references: [id])
-
-  @@index([propertyId])
+model Premio {
+    id        Int       @id @default(autoincrement())
+    nome      String
+    descricao String?   @db.Text
+    imagemUrl String?   @db.Text
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+    sorteios  Sorteio[]
 }
 
-model QuickReply {
-  id          String   @id
-  userId      String
-  title       String
-  content     String?  @db.Text
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime
-  audioUrl    String?  @db.Text
-  documentUrl String?  @db.Text
-  imageUrl    String?  @db.Text
-  videoUrl    String?  @db.Text
-  Team        Team     @relation(fields: [userId], references: [id])
+model Sorteio {
+    id            Int                @id @default(autoincrement())
+    premioId      Int
+    tipoSorteio   TipoSorteio
+    createdAt     DateTime           @default(now())
+    updatedAt     DateTime           @updatedAt
+    mesReferencia String
+    userId        Int?
+    realizado     Boolean            @default(false)
+    historico     HistoricoSorteio[]
+    premio        Premio             @relation(fields: [premioId], references: [id])
+    User          User?              @relation(fields: [userId], references: [id])
 
-  @@index([userId])
+    @@index([premioId])
+    @@index([tipoSorteio])
+    @@index([mesReferencia])
+    @@index([realizado])
+    @@index([userId])
+}
+
+model HistoricoSorteio {
+    id                 Int         @id @default(autoincrement())
+    sorteioId          Int
+    tipoSorteio        TipoSorteio
+    clienteVencedorId  Int?
+    fichaVencedoraId   Int?
+    totalParticipantes Int
+    dataRealizacao     DateTime    @default(now())
+    realizadoPor       Int?
+    createdAt          DateTime    @default(now())
+    realizador         User?       @relation("HistoricoSorteioRealizador", fields: [realizadoPor], references: [id])
+    sorteio            Sorteio     @relation(fields: [sorteioId], references: [id], onDelete: Cascade)
+
+    @@index([sorteioId])
+    @@index([tipoSorteio])
+    @@index([clienteVencedorId])
+    @@index([fichaVencedoraId])
+    @@index([realizadoPor])
+    @@index([dataRealizacao])
+}
+
+model ClientStatusHistory {
+    id              Int                                 @id @default(autoincrement())
+    clientId        Int
+    userId          Int
+    statusAnterior  ClientStatusHistory_statusAnterior?
+    statusNovo      ClientStatusHistory_statusNovo
+    observacao      String?                             @db.Text
+    motivoAlteracao String?                             @db.Text
+    createdAt       DateTime                            @default(now())
+    Client          Client                              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+    User            User                                @relation(fields: [userId], references: [id])
+
+    @@index([clientId])
+    @@index([createdAt])
+    @@index([statusNovo])
+    @@index([userId])
+}
+
+model HistoricoContestacao {
+    id                              Int                         @id @default(autoincrement())
+    clientId                        Int
+    contestadoPor                   Int
+    dataContestacao                 DateTime                    @default(now())
+    observacaoContestacao           String                      @db.Text
+    valorLiberadoDesejado           Float?
+    quantidadeParcelasDesejadas     Int?
+    valorParcelaDesejada            Float?
+    status                          HistoricoContestacao_status @default(PENDENTE)
+    revisadoPor                     Int?
+    dataRevisaoContestacao          DateTime?
+    observacaoFinanceiroContestacao String?                     @db.Text
+    valorLiberadoAprovado           Float?
+    quantidadeParcelasAprovadas     Int?
+    valorParcelaAprovada            Float?
+    createdAt                       DateTime                    @default(now())
+    updatedAt                       DateTime                    @updatedAt
+    client                          Client                      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+    contestador                     User                        @relation("ContestacaoContestador", fields: [contestadoPor], references: [id])
+    revisor                         User?                       @relation("ContestacaoRevisor", fields: [revisadoPor], references: [id])
+
+    @@index([clientId])
+    @@index([contestadoPor])
+    @@index([revisadoPor])
+    @@index([dataContestacao])
+    @@index([status])
+}
+
+model ClientWppSession {
+    id                String          @id
+    clientId          Int
+    whatsappSessionId String
+    createdAt         DateTime        @default(now())
+    updatedAt         DateTime
+    userId            Int?
+    Client            Client          @relation(fields: [clientId], references: [id])
+    User              User?           @relation(fields: [userId], references: [id])
+    WhatsAppSession   WhatsAppSession @relation(fields: [whatsappSessionId], references: [id])
+
+    @@index([clientId])
+    @@index([whatsappSessionId])
+    @@index([userId], map: "ClientWppSession_userId_fkey")
+}
+
+model PlanoRenegociacao {
+    id                 Int      @id @default(autoincrement())
+    valorLiberado      Float
+    quantidadeParcelas Int
+    valorParcela       Float
+    prazoLiberacao     Int      @default(30) // Prazo em dias para liberar o valor
+    ordem              Int      @default(0) // Ordem de exibição
+    ativo              Boolean  @default(true)
+    createdAt          DateTime @default(now())
+    updatedAt          DateTime @updatedAt
+
+    @@index([valorLiberado])
+    @@index([ativo])
+}
+
+model PlanoRenegociacaoAprovado {
+    id                     Int      @id @default(autoincrement())
+    clientId               Int
+    planoId                Int? // Se for NULL, é um plano customizado
+    valorLiberado          Float
+    quantidadeParcelas     Int
+    valorParcela           Float
+    prazoLiberacao         Int      @default(30)
+    aprovadoPorFinanceiro  Boolean  @default(true)
+    selecionadoPorVendedor Boolean  @default(false)
+    createdAt              DateTime @default(now())
+    updatedAt              DateTime @updatedAt
+
+    @@index([clientId])
+    @@index([planoId])
+    @@index([aprovadoPorFinanceiro])
+    @@index([selecionadoPorVendedor])
+}
+
+enum TipoMovimento {
+    CREDITO
+    DEBITO
+}
+
+enum TipoResidencia {
+    PROPRIA
+    ALUGADA
+    MORA_COM_TERCEIROS
+}
+
+enum DeviceType {
+    MOBILE
+    DESKTOP
+}
+
+enum Role {
+    SUBSCRIBER
+    VENDEDOR
+    GERENTE
+    SECRETARIO
+    ADMINISTRADOR
+    COBRADOR
+    FINANCEIRO
+    DOUTOR
+    ADMIN
+    COLETOR
+}
+
+enum StatusCliente {
+    CASA_PROPRIA_QUITADA
+    CASA_PROPRIA_FINANCIADA
+    CASA_CONJUGE
+    CASA_PAI_MAE
+    CASA_OUTRO_FAMILIAR
+    ALUGUEL_IMOBILIARIA
+    ALUGUEL_CONTRATO_PARTICULAR
+    ALUGUEL_SEM_CONTRATO
+}
+
+enum DataVencimento {
+    DIA_05
+    DIA_10
+    DIA_15
+    DIA_20
+    DIA_25
+    DIA_30
+}
+
+enum StatusCobranca {
+    PAGOU_BOLETO_INTEGRAL
+    PAGOU_PARTE_VIA_PIX
+    PAGOU_PARTE_NO_ESCRITORIO
+    VAI_PAGAR_HOJE
+    REAGENDOU
+    EM_ANDAMENTO
+}
+
+enum ResultadoCobranca {
+    CONTATO_ESTABELECIDO
+    CLIENTE_NAO_ENCONTRADO
+    CLIENTE_INDISPONIVEL
+    PROMESSA_PAGAMENTO
+    PAGAMENTO_PARCIAL
+    PAGAMENTO_INTEGRAL
+    REAGENDAMENTO
+    RECUSA_PAGAMENTO
+    CLIENTE_FALECIDO
+    ENDERECO_INCORRETO
+    TELEFONE_INCORRETO
+    OUTROS
+}
+
+enum QuemFoiCobrado {
+    O_PROPRIO_DEVEDOR
+    PAI
+    MAE
+    IRMAO
+    CONJUGE
+    FILHO
+    SOGRO
+    TIO
+    PRIMO
+    CUNHADO
+    VIZINHO
+    AMIGO
+    AVALISTA
+}
+
+enum OndeFoiCobrado {
+    TELEFONE
+    PRESENCIAL_RESIDENCIA
+    PRESENCIAL_TRABALHO
+    PRESENCIAL_RESIDENCIA_CONTATOS
+    PRESENCIAL_NO_ESCRITORIO
+}
+
+enum InternalChatType {
+    VENDEDOR_GERENTE
+    SECRETARIO_GERENTE
+    COBRADOR_SECRETARIO
+    GERAL_ADMINISTRACAO
+}
+
+enum Client_status {
+    PRE_ATENDIMENTO
+    APROVADO_GERENTE
+    POS_APROVACAO
+    APROVADO_GERENTE_FINAL
+    APROVADO_FINANCEIRO_BOLETO
+    APROVADO_SECRETARIO_REFERENCIAS
+    APROVADO_DOUTOR
+    AGUARDANDO_SELFIE_CLIENTE
+    APROVADO_SECRETARIO_FINAL
+    APROVADO_FINANCEIRO_FINAL
+    REPROVADO
+    REPROVADO_SECRETARIO
+    REPROVADO_DOUTOR
+    PENDENTE
+    APROVADO
+    EM_ANALISE
+    FINALIZADO
+    APROVADO_SECRETARIO
+    PAGAMENTO_ENVIADO
+    NAO_RESPONDEU
+    RENEGOCIACAO_PRE_ATENDIMENTO
+    RENEGOCIACAO_APROVADO_FINANCEIRO
+    RENEGOCIACAO_REPROVADO_FINANCEIRO
+    RENEGOCIACAO_APROVADO_GERENTE
+    RENEGOCIACAO_POS_APROVACAO
+    RENEGOCIACAO_APROVADO_GERENTE_FINAL
+    RENEGOCIACAO_APROVADO_FINANCEIRO_BOLETO
+    RENEGOCIACAO_APROVADO_SECRETARIO_REFERENCIAS
+    RENEGOCIACAO_APROVADO_DOUTOR
+    RENEGOCIACAO_AGUARDANDO_SELFIE_CLIENTE
+    RENEGOCIACAO_APROVADO_SECRETARIO_FINAL
+    RENEGOCIACAO_SECRETARIO_REFERENCIAS
+    RENEGOCIACAO_SECRETARIO_FINAL
+    RENEGOCIACAO_APROVADO_FINANCEIRO_FINAL
+    RENEGOCIACAO_REPROVADO
+    RENEGOCIACAO_REPROVADO_SECRETARIO
+    RENEGOCIACAO_FINANCEIRO_BOLETO
+    RENEGOCIACAO_DOUTOR_APROVADO
+    RENEGOCIACAO_REPROVADO_DOUTOR
+    RENEGOCIACAO_PENDENTE
+    RENEGOCIACAO_EM_ANALISE
+    RENEGOCIACAO_FINALIZADO
+    RENEGOCIACAO_APROVADO_SECRETARIO
+    RENEGOCIACAO_PAGAMENTO_ENVIADO
+    RENEGOCIACAO_PARCELAS_APROVADO_FINANCEIRO
+    RENEGOCIACAO_PARCELAS_REPROVADO_FINANCEIRO
+    RENEGOCIACAO_PARCELAS_DIRECIONADO_GERENTE
+    RENEGOCIACAO_CONTESTACAO_FINANCEIRO
+    RENEGOCIACAO_CONTESTACAO_APROVADA_FINANCEIRO
+    RENEGOCIACAO_PAROU_DE_RESPONDER
+    RENEGOCIACAO_NAO_QUIS
+    RENEGOCIACAO_REPROVADO_GERENTE
+    RENEGOCIACAO_REPROVADO_FINANCEIRO_INICIO
+}
+
+enum Client_tipoNegociacao {
+    NOVA
+    RENEGOCIACAO
+}
+
+enum CobrancaCobrador_status {
+    PENDENTE
+    VENCIDO
+    PAGO
+    CANCELADO
+    EM_ANALISE
+    AGUARDANDO_PAGAMENTO
+    PAGAMENTO_PARCIAL
+    REAGENDOU
+    RECUSADO_FINANCEIRO
+    NAOENCONTRADO
+    VERIFICADO
+}
+
+enum CobrancaCobrador_tipoContato {
+    TELEFONE
+    WHATSAPP
+    PRESENCIAL_RESIDENCIA
+    PRESENCIAL_TRABALHO
+    PRESENCIAL_ESCRITORIO
+    PRESENCIAL_ENDERECO_REFERENCIA
+    WHATSAPP_REFERENCIA
+    EMAIL
+    SMS
+    OUTROS
+}
+
+enum Cobranca_status {
+    PENDENTE
+    VENCIDO
+    PAGO
+    CANCELADO
+    EM_ANALISE
+    AGUARDANDO_PAGAMENTO
+    PAGAMENTO_PARCIAL
+    REAGENDOU
+    RECUSADO_FINANCEIRO
+    REMOVIDA
+    EM_NEGATIVACAO
+}
+
+enum FichaCadastro_fonteRenda {
+    REGISTRADO
+    INFORMAL
+    APOSENTADO
+    PENSIONISTA
+    AUTONOMO
+}
+
+enum Client_fonteRenda {
+    REGISTRADO
+    INFORMAL
+    APOSENTADO
+    PENSIONISTA
+    AUTONOMO
+}
+
+enum TipoSorteio {
+    CLIENTE
+    FICHA
+}
+
+enum ClientStatusHistory_statusAnterior {
+    PRE_ATENDIMENTO
+    APROVADO_GERENTE
+    POS_APROVACAO
+    APROVADO_GERENTE_FINAL
+    APROVADO_FINANCEIRO_BOLETO
+    APROVADO_SECRETARIO_REFERENCIAS
+    APROVADO_DOUTOR
+    AGUARDANDO_SELFIE_CLIENTE
+    APROVADO_SECRETARIO_FINAL
+    APROVADO_FINANCEIRO_FINAL
+    REPROVADO
+    REPROVADO_SECRETARIO
+    REPROVADO_DOUTOR
+    PENDENTE
+    APROVADO
+    EM_ANALISE
+    FINALIZADO
+    APROVADO_SECRETARIO
+    PAGAMENTO_ENVIADO
+    NAO_RESPONDEU
+    RENEGOCIACAO_PRE_ATENDIMENTO
+    RENEGOCIACAO_APROVADO_FINANCEIRO
+    RENEGOCIACAO_REPROVADO_FINANCEIRO
+    RENEGOCIACAO_APROVADO_GERENTE
+    RENEGOCIACAO_POS_APROVACAO
+    RENEGOCIACAO_APROVADO_GERENTE_FINAL
+    RENEGOCIACAO_APROVADO_FINANCEIRO_BOLETO
+    RENEGOCIACAO_APROVADO_SECRETARIO_REFERENCIAS
+    RENEGOCIACAO_APROVADO_DOUTOR
+    RENEGOCIACAO_AGUARDANDO_SELFIE_CLIENTE
+    RENEGOCIACAO_APROVADO_SECRETARIO_FINAL
+    RENEGOCIACAO_SECRETARIO_REFERENCIAS
+    RENEGOCIACAO_SECRETARIO_FINAL
+    RENEGOCIACAO_APROVADO_FINANCEIRO_FINAL
+    RENEGOCIACAO_REPROVADO
+    RENEGOCIACAO_REPROVADO_SECRETARIO
+    RENEGOCIACAO_FINANCEIRO_BOLETO
+    RENEGOCIACAO_DOUTOR_APROVADO
+    RENEGOCIACAO_REPROVADO_DOUTOR
+    RENEGOCIACAO_PENDENTE
+    RENEGOCIACAO_EM_ANALISE
+    RENEGOCIACAO_FINALIZADO
+    RENEGOCIACAO_APROVADO_SECRETARIO
+    RENEGOCIACAO_PAGAMENTO_ENVIADO
+    RENEGOCIACAO_PARCELAS_APROVADO_FINANCEIRO
+    RENEGOCIACAO_PARCELAS_REPROVADO_FINANCEIRO
+    RENEGOCIACAO_PARCELAS_DIRECIONADO_GERENTE
+    RENEGOCIACAO_CONTESTACAO_FINANCEIRO
+    RENEGOCIACAO_CONTESTACAO_APROVADA_FINANCEIRO
+    RENEGOCIACAO_PAROU_DE_RESPONDER
+    RENEGOCIACAO_NAO_QUIS
+    RENEGOCIACAO_REPROVADO_GERENTE
+    RENEGOCIACAO_REPROVADO_FINANCEIRO_INICIO
+}
+
+enum ClientStatusHistory_statusNovo {
+    PRE_ATENDIMENTO
+    APROVADO_GERENTE
+    POS_APROVACAO
+    APROVADO_GERENTE_FINAL
+    APROVADO_FINANCEIRO_BOLETO
+    APROVADO_SECRETARIO_REFERENCIAS
+    APROVADO_DOUTOR
+    AGUARDANDO_SELFIE_CLIENTE
+    APROVADO_SECRETARIO_FINAL
+    APROVADO_FINANCEIRO_FINAL
+    REPROVADO
+    REPROVADO_SECRETARIO
+    REPROVADO_DOUTOR
+    PENDENTE
+    APROVADO
+    EM_ANALISE
+    FINALIZADO
+    APROVADO_SECRETARIO
+    PAGAMENTO_ENVIADO
+    NAO_RESPONDEU
+    RENEGOCIACAO_PRE_ATENDIMENTO
+    RENEGOCIACAO_APROVADO_FINANCEIRO
+    RENEGOCIACAO_REPROVADO_FINANCEIRO
+    RENEGOCIACAO_APROVADO_GERENTE
+    RENEGOCIACAO_POS_APROVACAO
+    RENEGOCIACAO_APROVADO_GERENTE_FINAL
+    RENEGOCIACAO_APROVADO_FINANCEIRO_BOLETO
+    RENEGOCIACAO_APROVADO_SECRETARIO_REFERENCIAS
+    RENEGOCIACAO_APROVADO_DOUTOR
+    RENEGOCIACAO_AGUARDANDO_SELFIE_CLIENTE
+    RENEGOCIACAO_APROVADO_SECRETARIO_FINAL
+    RENEGOCIACAO_SECRETARIO_REFERENCIAS
+    RENEGOCIACAO_SECRETARIO_FINAL
+    RENEGOCIACAO_APROVADO_FINANCEIRO_FINAL
+    RENEGOCIACAO_REPROVADO
+    RENEGOCIACAO_REPROVADO_SECRETARIO
+    RENEGOCIACAO_FINANCEIRO_BOLETO
+    RENEGOCIACAO_DOUTOR_APROVADO
+    RENEGOCIACAO_REPROVADO_DOUTOR
+    RENEGOCIACAO_PENDENTE
+    RENEGOCIACAO_EM_ANALISE
+    RENEGOCIACAO_FINALIZADO
+    RENEGOCIACAO_APROVADO_SECRETARIO
+    RENEGOCIACAO_PAGAMENTO_ENVIADO
+    RENEGOCIACAO_PARCELAS_APROVADO_FINANCEIRO
+    RENEGOCIACAO_PARCELAS_REPROVADO_FINANCEIRO
+    RENEGOCIACAO_PARCELAS_DIRECIONADO_GERENTE
+    RENEGOCIACAO_CONTESTACAO_FINANCEIRO
+    RENEGOCIACAO_CONTESTACAO_APROVADA_FINANCEIRO
+    RENEGOCIACAO_PAROU_DE_RESPONDER
+    RENEGOCIACAO_NAO_QUIS
+    RENEGOCIACAO_REPROVADO_GERENTE
+    RENEGOCIACAO_REPROVADO_FINANCEIRO_INICIO
+}
+
+enum HistoricoContestacao_status {
+    PENDENTE
+    APROVADA
+    REJEITADA
+}
+
+enum TipoUsuarioObservacao {
+    GERENTE
+    VENDEDOR
+    SECRETARIO
+    DOUTOR
+    FINANCEIRO
+    RENEGOCIADOR
+    COBRADOR
+    ADMINISTRADOR
+    ADMIN
+    OUTRO
+}
+
+enum TipoObservacao {
+    APROVACAO
+    REPROVACAO
+    ATENDIMENTO
+    BOLETO
+    FINANCEIRO_FINAL
+    RENEGOCIACAO
+    CONTESTACAO
+    NAO_QUIS
+    PAROU_DE_RESPONDER
+    VOLTOU_A_RESPONDER
+    RESIDENCIA
+    GERAL
 }
