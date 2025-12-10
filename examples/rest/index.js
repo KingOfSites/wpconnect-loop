@@ -1,7 +1,7 @@
 const express = require('express');
 const app = express();
 const wppconnect = require('@wppconnect-team/wppconnect');
-const WEBHOOK_URL = 'http://localhost:3000/api/whatsappwebhook'; // substitua pela sua!
+const WEBHOOK_URL = 'https://www.trianguloempresa.com/api/whatsappwebhook'; // substitua pela sua!
 const axios = require('axios');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
