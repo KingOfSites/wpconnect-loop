@@ -1,7 +1,7 @@
 const express = require('express');
 const app = express();
 const wppconnect = require('@wppconnect-team/wppconnect');
-const WEBHOOK_URL = 'https://www.trianguloempresa.com/api/whatsappwebhook'; // substitua pela sua!
+const WEBHOOK_URL = 'http://localhost:3000/api/whatsappwebhook'; // substitua pela sua!
 const axios = require('axios');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
@@ -300,6 +300,14 @@ async function createSessionInBackground(sessionName) {
     if (qrCodeDataTemp) client.qrCodeData = qrCodeDataTemp;
 
     client.onMessage(async (message) => {
+      // Ignora mensagens do tipo ciphertext sem corpo (são apenas notificações)
+      if (message.type === 'ciphertext' && !message.body) {
+        console.log(
+          `🔐 Mensagem ciphertext ignorada (sem corpo) na sessão ${sessionName}`
+        );
+        return;
+      }
+
       let processedMessage;
 
       if (message.type === 'document') {
@@ -313,8 +321,14 @@ async function createSessionInBackground(sessionName) {
       } else if (message.type === 'image') {
         processedMessage = processImageMessage(message);
         processedMessage.image.localDownloadUrl = `https://wppconnect-production-c06e.up.railway.app/${sessionName}/downloadmedia/${message.id}`;
+
+        // 🔍 DEBUG: Log completo do caption
         console.log(`🖼️ Imagem recebida na sessão ${sessionName}:`, {
           remetente: processedMessage.sender.name,
+          caption: message.caption || '(sem legenda)',
+          captionRaw: message.caption,
+          hasCaption: !!message.caption,
+          messageBody: message.body,
         });
       } else if (message.type === 'audio') {
         processedMessage = processAudioMessage(message);
@@ -378,6 +392,16 @@ async function createSessionInBackground(sessionName) {
       const chatId =
         message.chatId || (message.fromMe ? message.to : message.from);
       processedMessage.chatId = chatId;
+
+      // 🔍 DEBUG: Log do payload que será enviado ao webhook
+      if (processedMessage.type === 'image') {
+        console.log('📤 Enviando ao webhook (IMAGEM):', {
+          messageId: processedMessage.id,
+          caption: processedMessage.image?.caption,
+          hasCaption: !!processedMessage.image?.caption,
+        });
+      }
+
       axios
         .post(WEBHOOK_URL, {
           event: 'received',
@@ -484,6 +508,14 @@ async function getOrCreateSession(sessionName) {
     if (qrCodeDataTemp) client.qrCodeData = qrCodeDataTemp;
 
     client.onMessage(async (message) => {
+      // Ignora mensagens do tipo ciphertext sem corpo (são apenas notificações)
+      if (message.type === 'ciphertext' && !message.body) {
+        console.log(
+          `🔐 Mensagem ciphertext ignorada (sem corpo) na sessão ${sessionName}`
+        );
+        return;
+      }
+
       let processedMessage;
 
       // Processa diferentes tipos de mensagem
@@ -500,8 +532,14 @@ async function getOrCreateSession(sessionName) {
         processedMessage = processImageMessage(message);
         // Adiciona URL de download local
         processedMessage.image.localDownloadUrl = `https://wppconnect-production-c06e.up.railway.app/${sessionName}/downloadmedia/${message.id}`;
+
+        // 🔍 DEBUG: Log completo do caption
         console.log(`🖼️ Imagem recebida na sessão ${sessionName}:`, {
           remetente: processedMessage.sender.name,
+          caption: message.caption || '(sem legenda)',
+          captionRaw: message.caption,
+          hasCaption: !!message.caption,
+          messageBody: message.body,
         });
       } else if (message.type === 'audio') {
         processedMessage = processAudioMessage(message);
