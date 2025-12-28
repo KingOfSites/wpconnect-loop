@@ -1,7 +1,7 @@
 const express = require('express');
 const app = express();
 const wppconnect = require('@wppconnect-team/wppconnect');
-const WEBHOOK_URL = 'https://www.trianguloempresa.com/api/whatsappwebhook'; // substitua pela sua!
+const WEBHOOK_URL = 'https://crm-1-main.vercel.app/api/whatsappwebhook'; // substitua pela sua!
 const axios = require('axios');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
@@ -1426,7 +1426,7 @@ app.post('/:session/senddocument', async function (req, res) {
   // 🔔 Notificar webhook
   try {
     await axios.post(
-      WEBHOOK_URL || 'http://localhost:3000/api/whatsapp/webhook',
+      WEBHOOK_URL || 'https://crm-1-main.vercel.app/api/whatsapp/webhook',
       {
         event: 'sent',
         session: sessionName,
