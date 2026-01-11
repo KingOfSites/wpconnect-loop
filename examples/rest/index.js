@@ -1,7 +1,7 @@
 const express = require('express');
 const app = express();
 const wppconnect = require('@wppconnect-team/wppconnect');
-const WEBHOOK_URL = 'https://crm-1-main.vercel.app/api/whatsappwebhook'; // substitua pela sua!
+const WEBHOOK_URL = 'http://localhost:3000/api/whatsappwebhook'; // substitua pela sua!
 const axios = require('axios');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
@@ -79,8 +79,9 @@ app.use((req, res, next) => {
   }
 });
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Aumenta limite do body-parser para 50MB (necessário para áudios/vídeos em base64)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Função para processar mensagens de documento
 function processDocumentMessage(message) {
@@ -220,10 +221,17 @@ async function syncQrCodeState(sessionName, client) {
 async function createSessionInBackground(sessionName) {
   console.log('to entrando aqui');
   try {
-    sessionStatus[sessionName] = {
-      status: 'creating',
-      message: 'Iniciando criação da sessão...',
-    };
+    // ✅ Atualizar status apenas se ainda não existir (pode ter sido criado antes)
+    if (!sessionStatus[sessionName]) {
+      sessionStatus[sessionName] = {
+        status: 'creating',
+        message: 'Iniciando criação da sessão...',
+      };
+    } else {
+      // Atualizar mensagem se já existir
+      sessionStatus[sessionName].status = 'creating';
+      sessionStatus[sessionName].message = 'Iniciando criação da sessão...';
+    }
 
     cleanupSession(sessionName);
 
@@ -840,12 +848,26 @@ app.post('/:session/createsession', async function (req, res) {
 
     console.log(`Iniciando criação da sessão ${sessionName} em background...`);
 
+    // ✅ Criar sessionStatus ANTES de iniciar a criação em background
+    // Isso evita race condition onde o status é verificado antes do status ser criado
+    sessionStatus[sessionName] = {
+      status: 'creating',
+      message: 'Iniciando criação da sessão em background...',
+    };
+
     // Inicia a criação em background
     createSessionInBackground(sessionName).catch((error) => {
       console.error(
         `Erro na criação em background da sessão ${sessionName}:`,
         error
       );
+      // Atualizar status para erro se falhar
+      if (sessionStatus[sessionName]) {
+        sessionStatus[sessionName] = {
+          status: 'error',
+          message: error.message || 'Erro ao criar sessão',
+        };
+      }
     });
 
     // Retorna imediatamente
@@ -1201,8 +1223,48 @@ app.post('/:session/sendptt', async function (req, res) {
     if (!numeroexiste || !numeroexiste.canReceiveMessage)
       throw new Error('Número não disponível ou bloqueado');
 
+    // 🔹 Se for base64 (data:audio/...;base64,...)
+    if (audioPath.startsWith('data:audio/')) {
+      console.log('🎤 Detectado áudio em base64, processando...');
+
+      // Extrai o base64 do data URI
+      const matches = audioPath.match(/^data:audio\/([^;]+);base64,(.+)$/);
+      if (!matches) throw new Error('Formato base64 inválido');
+
+      const mimeType = matches[1]; // webm, ogg, etc
+      const base64Data = matches[2];
+      const audioBuffer = Buffer.from(base64Data, 'base64');
+
+      console.log(
+        `📦 Áudio base64 decodificado (${audioBuffer.length} bytes, tipo: ${mimeType})`
+      );
+
+      // Salva temporariamente
+      const tempInput = path.join(__dirname, `temp_${Date.now()}.${mimeType}`);
+      const tempOutput = path.join(__dirname, `ptt_${Date.now()}.ogg`);
+
+      fs.writeFileSync(tempInput, audioBuffer);
+
+      // Converte para OGG Opus
+      await new Promise((resolve, reject) => {
+        ffmpeg(tempInput)
+          .inputFormat(mimeType === 'webm' ? 'webm' : 'auto')
+          .audioCodec('libopus')
+          .audioBitrate('64k')
+          .audioChannels(1)
+          .audioFrequency(48000)
+          .format('ogg')
+          .on('end', resolve)
+          .on('error', reject)
+          .save(tempOutput);
+      });
+
+      fs.unlinkSync(tempInput);
+      finalPath = tempOutput;
+      console.log('✅ Base64 convertido para OGG Opus:', finalPath);
+    }
     // 🔹 Se for URL, baixa e converte
-    if (/^https?:\/\//i.test(audioPath)) {
+    else if (/^https?:\/\//i.test(audioPath)) {
       console.log('🎤 Baixando áudio da URL:', audioPath);
       const resp = await axios.get(audioPath, { responseType: 'arraybuffer' });
 
@@ -1426,7 +1488,7 @@ app.post('/:session/senddocument', async function (req, res) {
   // 🔔 Notificar webhook
   try {
     await axios.post(
-      WEBHOOK_URL || 'https://crm-1-main.vercel.app/api/whatsapp/webhook',
+      WEBHOOK_URL || 'http://localhost:3000/api/whatsapp/webhook',
       {
         event: 'sent',
         session: sessionName,
@@ -1907,14 +1969,15 @@ app.post('/:session/dispatch-campaign', async function (req, res) {
     .substr(2, 9)}`;
 
   try {
+    // ⚠️ DESATIVADO: Usando dispatcher-whatsapp-zeuscapital externo
     // Inicia o processamento em background
-    processCampaignInBackground(
-      campaignId,
-      sessionName,
-      campaign,
-      templates,
-      contacts
-    );
+    // processCampaignInBackground(
+    //   campaignId,
+    //   sessionName,
+    //   campaign,
+    //   templates,
+    //   contacts
+    // );
 
     res.send({
       status: true,
